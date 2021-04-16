@@ -10,7 +10,7 @@ GCOV_PREFIX=/home/fuzzing /work/pure-ftpd/src/pure-ftpd -A &
 serverpid=$!
 
 # start client
-/work/msgbounds -host=localhost:21 \
+/work/tester -host=localhost:21 \
     -init-sleep=0 \
     -init-read=false \
     -sleep=0 \

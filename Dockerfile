@@ -27,6 +27,6 @@ RUN git clone --depth 1 https://github.com/jedisct1/pure-ftpd.git --branch 1.0.4
  && ./autogen.sh \
  && CFLAGS="-fprofile-arcs -ftest-coverage" ./configure --without-privsep -without-capabilities \
  && make -j
-COPY --from=tool-build /work/msgbounds .
+COPY --from=tool-build /work/msgbounds-tester tester
 COPY scripts/pure-ftpd.sh .
 ENTRYPOINT ./pure-ftpd.sh
