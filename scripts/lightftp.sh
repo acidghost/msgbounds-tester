@@ -20,7 +20,7 @@ serverpid=$!
 
 # XXX: DialTimeout is not working in go tester
 sleep 1s
-/work/tester -host=localhost:2200 "$@" &
+/work/tester -dir=msgs -host=localhost:2200 "$@" &
 clientpid=$!
 
 set +e

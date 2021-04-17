@@ -15,3 +15,4 @@ check: check-scripts check-tester
 
 lightftp: ; $(dockerize) $@
 pure-ftpd: ; $(dockerize) $@
+live555: ; $(dockerize) $@

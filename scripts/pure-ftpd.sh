@@ -14,7 +14,7 @@ set -e
 GCOV_PREFIX=/home/fuzzing timeout 5s /work/pure-ftpd/src/pure-ftpd -A &
 serverpid=$!
 
-/work/tester -host=localhost:21 "$@" &
+/work/tester -dir=msgs -host=localhost:21 "$@" &
 clientpid=$!
 
 set +e

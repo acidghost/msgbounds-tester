@@ -16,12 +16,15 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
 
 var (
 	flagHost      = flag.String("host", "172.17.0.2:21", "host to connect to")
+	flagDir       = flag.String("dir", "messages/ftp", "folder with messages to send")
 	flagRead      = flag.Bool("read", false, "read server replies")
 	flagSimpRead  = flag.Bool("simp", false, "read with a single call")
 	flagTimeout   = flag.Duration("time", 30*time.Millisecond, "read deadline")
@@ -31,16 +34,11 @@ var (
 	flagFinSleep  = flag.Duration("fin-sleep", 3*time.Second, "sleep before closing")
 )
 
-var msgs = [...][]byte{
-	[]byte("USER fuzzing\r\n"),
-	[]byte("PASS fuzzing\r\n"),
-	[]byte("LIST\r\n"),
-	[]byte("QUIT\r\n"),
-}
-
 func main() {
 	flag.Parse()
 	log.SetFlags(log.Lmicroseconds)
+
+	msgs := loadMessages(*flagDir)
 
 	signChan := make(chan os.Signal)
 	go func() {
@@ -74,7 +72,7 @@ func main() {
 	}
 
 	for i, msg := range msgs {
-		log.Printf("Sending %d: %s\n", i, msg[:len(msg)-2])
+		log.Printf("Sending %d: %s\n", i, ppMsg(msg))
 		n, err := conn.Write(msg)
 		if err != nil {
 			log.Fatalf("Failed to send message %d: %v\n", i, err)
@@ -92,6 +90,40 @@ func main() {
 
 	// wait for server to exit before closing?
 	time.Sleep(*flagFinSleep)
+}
+
+func loadMessages(dir string) [][]byte {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		log.Fatalf("Failed to read dir: %v\n", err)
+	}
+	msgs := make([][]byte, 0, len(entries))
+	for _, entry := range entries {
+		name := filepath.Join(dir, entry.Name())
+		msg, err := os.ReadFile(name)
+		if err != nil {
+			log.Fatalf("Failed to read message from file: %v\n", err)
+		}
+		log.Printf("Loaded message %s (%d bytes)\n", name, len(msg))
+		msgs = append(msgs, msg)
+	}
+	return msgs
+}
+
+func ppMsg(msg []byte) string {
+	const MAX int = 50
+	trunc := false
+	l := len(msg)
+	if l > MAX {
+		trunc = true
+		l = MAX
+	}
+	replacer := strings.NewReplacer("\r", "\\r", "\n", "\\n", "\t", "\\t")
+	s := replacer.Replace(string(msg[:l]))
+	if trunc {
+		s += "..."
+	}
+	return s
 }
 
 func recv(c net.Conn, simple bool) (buf []byte, err error) {
