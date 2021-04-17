@@ -8,7 +8,10 @@ all:
 check-scripts:
 	shellcheck -x -P scripts $(scripts)
 
-check: check-scripts
+check-tester:
+	golangci-lint run
+
+check: check-scripts check-tester
 
 lightftp: ; $(dockerize) $@
 pure-ftpd: ; $(dockerize) $@
