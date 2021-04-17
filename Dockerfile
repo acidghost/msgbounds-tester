@@ -28,5 +28,25 @@ RUN git clone --depth 1 https://github.com/jedisct1/pure-ftpd.git --branch 1.0.4
  && CFLAGS="-fprofile-arcs -ftest-coverage" ./configure --without-privsep -without-capabilities \
  && make -j
 COPY --from=tool-build /work/msgbounds-tester tester
-COPY scripts/pure-ftpd.sh .
-ENTRYPOINT ./pure-ftpd.sh
+COPY scripts/common.bash scripts/pure-ftpd.sh .
+ENTRYPOINT ["./pure-ftpd.sh"]
+CMD ["-init-sleep=0", "-init-read=false", "-sleep=0", "-read=false"]
+
+FROM runtime AS lightftp
+RUN apt-get update \
+ && apt-get install -y libgnutls28-dev \
+ && rm -rf /var/cache/apt/* \
+ && groupadd fuzzing \
+ && useradd -rm -d /home/fuzzing -s /bin/bash -g fuzzing -G sudo -u 1000 fuzzing \
+        -p "$(openssl passwd -1 fuzzing)"
+COPY patches/lightftp-gcov.patch gcov.patch
+RUN git clone https://github.com/hfiref0x/LightFTP.git \
+ && cd LightFTP \
+ && git checkout --detach 5980ea1 \
+ && patch -p1 < ../gcov.patch \
+ && cd Source/Release \
+ && CFLAGS="-fprofile-arcs -ftest-coverage" make -j
+COPY --from=tool-build /work/msgbounds-tester tester
+COPY scripts/common.bash scripts/lightftp.sh assets/certificate/ assets/lightftp.conf .
+ENTRYPOINT ["./lightftp.sh"]
+CMD ["-init-sleep=0", "-init-read=false", "-sleep=25us", "-read=false"]

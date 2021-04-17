@@ -1,4 +1,5 @@
 msgbounds
+Makefile
 Dockerfile
 .dockerignore
 .git*

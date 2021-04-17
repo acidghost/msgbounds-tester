@@ -14,6 +14,9 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -39,8 +42,16 @@ func main() {
 	flag.Parse()
 	log.SetFlags(log.Lmicroseconds)
 
+	signChan := make(chan os.Signal)
+	go func() {
+		<-signChan
+		log.Printf("Signaled to quit\n")
+		os.Exit(0)
+	}()
+	signal.Notify(signChan, syscall.SIGTERM)
+
 	log.Printf("Connecting to %s...\n", *flagHost)
-	conn, err := net.Dial("tcp", *flagHost)
+	conn, err := net.DialTimeout("tcp", *flagHost, 10*time.Second)
 	if err != nil {
 		log.Fatalf("Could not connect: %v", err)
 	}
