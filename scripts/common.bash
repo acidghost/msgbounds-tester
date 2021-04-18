@@ -3,7 +3,7 @@ COVOUT="/work/cov.json"
 function check_help {
     local opt
     for opt in "$@"; do
-        if [[ "$opt" =~ -h|-help ]]; then
+        if [[ "$opt" =~ ^-h(elp)?$ ]]; then
             /work/tester -h
             exit $?
         fi

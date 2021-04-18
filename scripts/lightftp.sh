@@ -14,18 +14,8 @@ if ! (mkdir /home/fuzzing/ftpshare && chown fuzzing:fuzzing /home/fuzzing/ftpsha
     exit 1
 fi
 
-set -e
-timeout 5s /work/LightFTP/Source/Release/fftp /work/lightftp.conf 2200 &
-serverpid=$!
-
-# XXX: DialTimeout is not working in go tester
-sleep 1s
-/work/tester -dir=msgs -host=localhost:2200 "$@" &
-clientpid=$!
-
-set +e
-wait "$serverpid"
-kill "$clientpid" > /dev/null 2>&1
+/work/tester -dir=msgs -host=localhost:2200 "$@" -- \
+    /work/LightFTP/Source/Release/fftp /work/lightftp.conf 2200
 
 dump_coverage /work/LightFTP
 check_line "LIST" "Source/Release/ftpserv.c" 714

@@ -10,16 +10,8 @@ killall -9 pure-ftpd > /dev/null 2>&1
 gcovr -r /work/pure-ftpd -d > /dev/null 2>&1
 rm -rf /home/fuzzing/*
 
-set -e
-GCOV_PREFIX=/home/fuzzing timeout 5s /work/pure-ftpd/src/pure-ftpd -A &
-serverpid=$!
-
-/work/tester -dir=msgs -host=localhost:21 "$@" &
-clientpid=$!
-
-set +e
-wait "$serverpid"
-kill "$clientpid" > /dev/null 2>&1
+GCOV_PREFIX=/home/fuzzing /work/tester -dir=msgs -host=localhost:21 "$@" -- \
+    /work/pure-ftpd/src/pure-ftpd -A
 
 # copy gcda from chrooted folder to source folder
 cp /home/fuzzing/work/pure-ftpd/src/*.gcda /work/pure-ftpd/src

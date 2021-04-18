@@ -1,6 +1,8 @@
 FROM golang:1.16 AS tool-build
 WORKDIR /work
-COPY *.go go.mod .
+COPY go.mod go.sum .
+RUN go mod download
+COPY *.go .
 RUN go build
 
 FROM ubuntu:20.04 AS runtime

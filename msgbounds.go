@@ -1,25 +1,22 @@
 // Test how a server responds to different ways of interacting with it.
-//
-// Some sample parameters with the objective of making the interaction as fast as possible:
-// - pure-ftpd: -init-sleep=0 -init-read=false -sleep=0 -read=false -fin-sleep=1s
-//              (waiting for the server to finish its stuff is important, otherwise it'll fail
-//              writing to the socket and exit before processing the other requests);
-// - lightftp:  -init-sleep=0 -init-read=false -sleep=1us -read=false -fin-sleep=1s
-//              (same as above, but also needs 1us of wait time to properly separate messages).
 package main
 
 import (
 	"errors"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 var (
@@ -32,13 +29,41 @@ var (
 	flagInitSleep = flag.Duration("init-sleep", 10*time.Millisecond, "sleep after connection")
 	flagSleep     = flag.Duration("sleep", 1*time.Millisecond, "sleep after each send")
 	flagFinSleep  = flag.Duration("fin-sleep", 3*time.Second, "sleep before closing")
+	flagSignal    = flag.Int("signal", int(unix.SIGTERM), "signal to stop the server")
 )
 
 func main() {
+	flag.CommandLine.SetOutput(os.Stdout)
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(),
+			"Usage: %s [flags] [target [args...]]\n", os.Args[0])
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 	log.SetFlags(log.Lmicroseconds)
 
+	stopSignal := syscall.Signal(*flagSignal)
+
 	msgs := loadMessages(*flagDir)
+
+	var serv *server
+	if flag.NArg() > 0 {
+		args := flag.Args()
+		cmd := exec.Command(args[0], args[1:]...)
+		stdout, err := cmd.StdoutPipe()
+		log.Printf("Starting server %q\n", cmd)
+		if err != nil {
+			log.Fatalf("Failed to get server's stdout: %v\n", err)
+		}
+		stderr, err := cmd.StderrPipe()
+		if err != nil {
+			log.Fatalf("Failed to get server's stderr: %v\n", err)
+		}
+		if err := cmd.Start(); err != nil {
+			log.Fatalf("Failed to start server: %v\n", err)
+		}
+		serv = &server{cmd, stdout, stderr}
+	}
 
 	signChan := make(chan os.Signal)
 	go func() {
@@ -46,12 +71,12 @@ func main() {
 		log.Printf("Signaled to quit\n")
 		os.Exit(0)
 	}()
-	signal.Notify(signChan, syscall.SIGTERM)
+	signal.Notify(signChan, unix.SIGTERM)
 
 	log.Printf("Connecting to %s...\n", *flagHost)
-	conn, err := net.DialTimeout("tcp", *flagHost, 10*time.Second)
+	conn, err := connect(*flagHost)
 	if err != nil {
-		log.Fatalf("Could not connect: %v", err)
+		log.Fatalf("Could not connect: %v\n", err)
 	}
 	defer conn.Close()
 
@@ -88,8 +113,27 @@ func main() {
 		}
 	}
 
-	// wait for server to exit before closing?
-	time.Sleep(*flagFinSleep)
+	if serv == nil {
+		time.Sleep(*flagFinSleep)
+	} else {
+		wait := false
+		select {
+		case <-time.After(*flagFinSleep):
+			log.Printf("Reached timeout before server exited\n")
+			serv.stop(stopSignal)
+			wait = true
+		case <-serv.wait():
+		}
+		serv.Stdout()
+		serv.Stderr()
+		if wait {
+			var exitErr *exec.ExitError
+			if err := serv.cmd.Wait(); err != nil && !errors.As(err, &exitErr) {
+				log.Fatalf("Failed to wait for server's termination: %v\n", err)
+			}
+			log.Printf("Server's exit code: %d\n", serv.cmd.ProcessState.ExitCode())
+		}
+	}
 }
 
 func loadMessages(dir string) [][]byte {
@@ -108,6 +152,82 @@ func loadMessages(dir string) [][]byte {
 		msgs = append(msgs, msg)
 	}
 	return msgs
+}
+
+type server struct {
+	cmd    *exec.Cmd
+	stdout io.ReadCloser
+	stderr io.ReadCloser
+}
+
+func (s *server) wait() <-chan unix.WaitStatus {
+	c := make(chan unix.WaitStatus)
+	go func() {
+		var ws unix.WaitStatus
+		for {
+			pid, err := unix.Wait4(s.cmd.Process.Pid, &ws, unix.WNOHANG, nil)
+			if err != nil {
+				log.Fatalf("Failed to wait for server PID %d: %v\n", s.cmd.Process.Pid, err)
+			} else if pid == s.cmd.Process.Pid && (ws.Exited() || ws.Signaled()) {
+				c <- ws
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+	return c
+}
+
+func (s *server) stop(signal os.Signal) {
+	log.Printf("Stopping server...\n")
+	if err := s.cmd.Process.Signal(signal); err != nil && !errors.Is(err, os.ErrProcessDone) {
+		log.Printf("Could not kill server (PID %d): %v\n", s.cmd.Process.Pid, err)
+	}
+}
+
+func (s *server) Stdout() {
+	s.output(false)
+}
+
+func (s *server) Stderr() {
+	s.output(true)
+}
+
+func (s *server) output(stderr bool) {
+	var r io.ReadCloser
+	var str string
+	if stderr {
+		r, str = s.stderr, "stderr"
+	} else {
+		r, str = s.stdout, "stdout"
+	}
+	out, err := io.ReadAll(r)
+	if err == nil {
+		if len(out) > 0 {
+			log.Printf("Server's %s:\n%s\n", str, out)
+		} else {
+			log.Printf("Server's %s: n/a\n", str)
+		}
+	} else {
+		log.Printf("Could not read server's %s: %v\n", str, err)
+	}
+}
+
+func connect(host string) (c net.Conn, err error) {
+	const T time.Duration = 6 * time.Second
+	timeout := time.After(T)
+	for {
+		c, err = net.Dial("tcp", host)
+		if err == nil {
+			return
+		}
+		select {
+		case <-timeout:
+			log.Fatalf("Timeout trying to connect to %q (%s)\n", host, T)
+		default:
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
 }
 
 func ppMsg(msg []byte) string {
