@@ -116,23 +116,25 @@ func main() {
 	if serv == nil {
 		time.Sleep(*flagFinSleep)
 	} else {
-		wait := false
+		exitCode, needWait := 0, true
 		select {
 		case <-time.After(*flagFinSleep):
 			log.Printf("Reached timeout before server exited\n")
 			serv.stop(stopSignal)
-			wait = true
-		case <-serv.wait():
+		case ws := <-serv.wait():
+			exitCode = ws.ExitStatus()
+			needWait = false
 		}
 		serv.Stdout()
 		serv.Stderr()
-		if wait {
+		if needWait {
 			var exitErr *exec.ExitError
 			if err := serv.cmd.Wait(); err != nil && !errors.As(err, &exitErr) {
 				log.Fatalf("Failed to wait for server's termination: %v\n", err)
 			}
-			log.Printf("Server's exit code: %d\n", serv.cmd.ProcessState.ExitCode())
+			exitCode = serv.cmd.ProcessState.ExitCode()
 		}
+		log.Printf("Server's exit code: %d\n", exitCode)
 	}
 }
 
