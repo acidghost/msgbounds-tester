@@ -16,5 +16,6 @@ GCOV_PREFIX=/home/fuzzing run_tester -dir=msgs -host=localhost:21 "$@" -- \
 # copy gcda from chrooted folder to source folder
 cp /home/fuzzing/work/pure-ftpd/src/*.gcda /work/pure-ftpd/src
 dump_coverage /work/pure-ftpd
+check_line "loggedin = 1" "src/ftpd.c" 1959
 check_line "LIST" "src/ftp_parser.c" 619
 check_line "QUIT" "src/ftp_parser.c" 344

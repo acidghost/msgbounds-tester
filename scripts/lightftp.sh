@@ -18,5 +18,6 @@ run_tester -dir=msgs -host=localhost:2200 "$@" -- \
     /work/LightFTP/Source/Release/fftp /work/lightftp.conf 2200
 
 dump_coverage /work/LightFTP
+check_line "successful PASS" "Source/Release/ftpserv.c" 1153
 check_line "LIST" "Source/Release/ftpserv.c" 714
 check_line "QUIT" "Source/Release/ftpserv.c" 435
