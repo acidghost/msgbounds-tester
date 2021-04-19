@@ -37,7 +37,7 @@ function check_line {
         return 1
     fi
     if [[ "$res" =~ [0-9]+ ]] && [[ "$res" -gt 0 ]]; then
-        echo "$file:$ln covered"
+        echo "$file:$ln covered $res times"
     else
         echo "$file:$ln NOT covered"
     fi
