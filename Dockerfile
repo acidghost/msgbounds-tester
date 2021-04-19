@@ -33,7 +33,7 @@ COPY --from=tool-build /work/msgbounds-tester tester
 COPY messages/ftp msgs
 COPY scripts/common.bash scripts/pure-ftpd.sh .
 ENTRYPOINT ["./pure-ftpd.sh"]
-CMD ["-init-sleep=0", "-init-read=false", "-sleep=0", "-read=false"]
+CMD ["-init-sleep=0", "-init-read=false", "-sleep=0", "-read=false", "-send-all"]
 
 FROM runtime AS lightftp
 RUN apt-get update \
@@ -68,4 +68,4 @@ COPY --from=tool-build /work/msgbounds-tester tester
 COPY messages/rtsp msgs
 COPY scripts/common.bash scripts/live555.sh assets/test.mp3 .
 ENTRYPOINT ["./live555.sh"]
-CMD ["-init-sleep=0", "-init-read=false", "-sleep=0", "-read=false"]
+CMD ["-init-sleep=0", "-init-read=false", "-sleep=0", "-read=false", "-send-all"]
