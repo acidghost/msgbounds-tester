@@ -10,7 +10,7 @@ killall -9 pure-ftpd > /dev/null 2>&1
 gcovr -r /work/pure-ftpd -d > /dev/null 2>&1
 rm -rf /home/fuzzing/*
 
-GCOV_PREFIX=/home/fuzzing /work/tester -dir=msgs -host=localhost:21 "$@" -- \
+GCOV_PREFIX=/home/fuzzing run_tester -dir=msgs -host=localhost:21 "$@" -- \
     /work/pure-ftpd/src/pure-ftpd -A
 
 # copy gcda from chrooted folder to source folder

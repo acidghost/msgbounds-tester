@@ -14,7 +14,7 @@ if ! (mkdir /home/fuzzing/ftpshare && chown fuzzing:fuzzing /home/fuzzing/ftpsha
     exit 1
 fi
 
-/work/tester -dir=msgs -host=localhost:2200 "$@" -- \
+run_tester -dir=msgs -host=localhost:2200 "$@" -- \
     /work/LightFTP/Source/Release/fftp /work/lightftp.conf 2200
 
 dump_coverage /work/LightFTP

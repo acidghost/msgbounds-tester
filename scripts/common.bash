@@ -10,6 +10,15 @@ function check_help {
     done
 }
 
+function run_tester {
+    if [ "$DO_STRACE" = 1 ]; then
+        strace -f -o /work/strace.log -x -yy -tt -e 'trace=%net,%process,%file,%desc' \
+            -- /work/tester "$@"
+    else
+        /work/tester "$@"
+    fi
+}
+
 function dump_coverage {
     if ! (gcovr -r "$1" -s | grep branch && gcovr -r "$1" --json > "$COVOUT"); then
         echo "!!! Something went wrong dumping coverage with gcovr"
